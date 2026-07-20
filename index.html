@@ -44,7 +44,7 @@
       background: #09090d;
     }
     .flame-box {
-      font-size: 70px;
+      font-size: 80px;
       transition: transform 0.2s ease, filter 0.2s ease;
       transform-origin: center center;
       user-select: none;
@@ -119,7 +119,8 @@
   </div>
 
   <script>
-    const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
+    // 採用安全加密連接端口 wss:// 8884，解決 GitHub Pages 跨網域安全性限制
+    const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
     const TOPIC_DATA = 'esp32/flame/data_7a44';
     const TOPIC_CMD  = 'esp32/flame/cmd_7a44';
