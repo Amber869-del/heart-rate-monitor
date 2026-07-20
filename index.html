@@ -17,7 +17,7 @@
     }
     .container {
       max-width: 480px;
-      margin: 0 auto;
+      margin: 20px auto;
       background: #181824;
       border-radius: 20px;
       padding: 25px;
@@ -42,10 +42,9 @@
       margin: 15px 0;
       border-radius: 12px;
       background: #09090d;
-      position: relative;
     }
     .flame-box {
-      font-size: 60px;
+      font-size: 70px;
       transition: transform 0.2s ease, filter 0.2s ease;
       transform-origin: center center;
       user-select: none;
@@ -56,12 +55,12 @@
       transform: scale(0.6);
     }
     .flame-active {
-      filter: drop-shadow(0 0 20px #ff3d00);
+      filter: drop-shadow(0 0 25px #ff3d00);
       animation: burn 0.2s infinite alternate ease-in-out;
     }
     @keyframes burn {
-      0% { transform: scale(1) rotate(-5deg); }
-      100% { transform: scale(1.1) rotate(5deg); }
+      0% { transform: scale(1.2) rotate(-5deg); }
+      100% { transform: scale(1.5) rotate(5deg); }
     }
     .status-badge {
       font-size: 18px;
@@ -101,7 +100,7 @@
 <body>
   <div class="container">
     <h1>🔥 火焰安全即時監控</h1>
-    <div id="connStatus" class="conn-status">🔴 雲端連線中斷</div>
+    <div id="connStatus" class="conn-status">🔴 雲端連線中...</div>
 
     <div class="flame-container">
       <div id="flameIcon" class="flame-box flame-safe">🔥</div>
@@ -120,7 +119,6 @@
   </div>
 
   <script>
-    // 使用 HiveMQ 公共 Broker 8000 Port (WebSocket)
     const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
 
     const TOPIC_DATA = 'esp32/flame/data_7a44';
@@ -145,7 +143,6 @@
           const data = JSON.parse(message.toString());
           document.getElementById('rawValue').innerText = data.raw;
           
-          // 計算強度百分比 (類比值越低，火焰越強)
           let intensity = Math.max(0, Math.min(100, ((4095 - data.raw) / 4095) * 100));
           document.getElementById('valBar').style.width = intensity.toFixed(0) + '%';
 
@@ -154,15 +151,10 @@
 
           if (data.isFire || data.latched) {
             flameIcon.className = 'flame-box flame-active';
-            // 動態放大 (最大約 2.5 倍)
-            let scaleVal = 1 + (intensity / 100) * 1.5;
-            flameIcon.style.transform = `scale(${scaleVal})`;
-            
             statusBadge.className = 'status-badge badge-danger';
             statusBadge.innerText = '🚨 警報！偵測到火源！';
           } else {
             flameIcon.className = 'flame-box flame-safe';
-            flameIcon.style.transform = 'scale(0.6)';
             statusBadge.className = 'status-badge badge-safe';
             statusBadge.innerText = '✅ 系統安全';
           }
@@ -176,7 +168,7 @@
       if (client.connected) {
         client.publish(TOPIC_CMD, 'RESET');
       } else {
-        alert('雲端未連線，請檢查 ESP32 是否開機連網！');
+        alert('雲端未連線，請確認 ESP32 是否已開機並連上網路！');
       }
     }
   </script>
