@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🔥 火焰即時監控面板 (MQTT 雲端版)</title>
+  <title>🔥 火焰即時監控面板</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
-      font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+      font-family: Arial, sans-serif;
       background: #0d0d11;
       color: #ffffff;
       text-align: center;
@@ -17,7 +17,7 @@
     }
     .container {
       max-width: 480px;
-      margin: 20px auto;
+      margin: 0 auto;
       background: #181824;
       border-radius: 20px;
       padding: 25px;
@@ -29,12 +29,12 @@
       font-size: 14px;
       padding: 6px 12px;
       border-radius: 12px;
-      background: #333;
+      background: #c62828;
       display: inline-block;
       margin-bottom: 15px;
     }
     .flame-container {
-      height: 200px;
+      height: 220px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -42,24 +42,26 @@
       margin: 15px 0;
       border-radius: 12px;
       background: #09090d;
+      position: relative;
     }
     .flame-box {
-      font-size: 16px;
-      transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      font-size: 60px;
+      transition: transform 0.2s ease, filter 0.2s ease;
       transform-origin: center center;
+      user-select: none;
     }
     .flame-safe {
-      filter: grayscale(100%);
-      opacity: 0.2;
-      transform: scale(0.1) !important;
+      filter: grayscale(80%);
+      opacity: 0.3;
+      transform: scale(0.6);
     }
     .flame-active {
-      filter: drop-shadow(0 0 25px #ff3d00);
+      filter: drop-shadow(0 0 20px #ff3d00);
       animation: burn 0.2s infinite alternate ease-in-out;
     }
     @keyframes burn {
-      0% { transform: rotate(-5deg); }
-      100% { transform: rotate(5deg); }
+      0% { transform: scale(1) rotate(-5deg); }
+      100% { transform: scale(1.1) rotate(5deg); }
     }
     .status-badge {
       font-size: 18px;
@@ -88,18 +90,18 @@
       font-size: 16px;
       font-weight: bold;
       color: #ffffff;
-      background: #c62828;
+      background: #d32f2f;
       border: none;
       border-radius: 10px;
       cursor: pointer;
     }
-    .reset-btn:active { background: #b71c1c; }
+    .reset-btn:active { background: #9a0007; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🔥 火焰安全即時監控 (雲端版)</h1>
-    <div id="connStatus" class="conn-status">📡 正在連線至雲端 Broker...</div>
+    <h1>🔥 火焰安全即時監控</h1>
+    <div id="connStatus" class="conn-status">🔴 雲端連線中斷</div>
 
     <div class="flame-container">
       <div id="flameIcon" class="flame-box flame-safe">🔥</div>
@@ -112,60 +114,70 @@
       <div class="bar-bg">
         <div id="valBar" class="bar-fill"></div>
       </div>
-      <small style="color: #aaa; margin-top: 6px; display: block;">* 數值越小代表火焰越近</small>
     </div>
 
     <button class="reset-btn" onclick="resetAlarm()">🔕 解除警報 / 誤觸復位</button>
   </div>
 
   <script>
-    // 連接至公共 MQTT Broker (WebSocket 連接埠 8000)
+    // 使用 HiveMQ 公共 Broker 8000 Port (WebSocket)
     const client = mqtt.connect('wss://broker.hivemq.com:8000/mqtt');
 
     const TOPIC_DATA = 'esp32/flame/data_7a44';
     const TOPIC_CMD  = 'esp32/flame/cmd_7a44';
 
     client.on('connect', () => {
-      document.getElementById('connStatus').innerText = '🟢 雲端已連線';
-      document.getElementById('connStatus').style.background = '#1b5e20';
+      const statusEl = document.getElementById('connStatus');
+      statusEl.innerText = '🟢 雲端已連線';
+      statusEl.style.background = '#1b5e20';
       client.subscribe(TOPIC_DATA);
     });
 
     client.on('offline', () => {
-      document.getElementById('connStatus').innerText = '🔴 雲端連線中斷';
-      document.getElementById('connStatus').style.background = '#c62828';
+      const statusEl = document.getElementById('connStatus');
+      statusEl.innerText = '🔴 雲端連線中斷';
+      statusEl.style.background = '#c62828';
     });
 
     client.on('message', (topic, message) => {
       if (topic === TOPIC_DATA) {
-        const data = JSON.parse(message.toString());
-        document.getElementById('rawValue').innerText = data.raw;
-        
-        let intensity = Math.max(0, Math.min(100, ((4095 - data.raw) / 4095) * 100));
-        document.getElementById('valBar').style.width = intensity.toFixed(0) + '%';
+        try {
+          const data = JSON.parse(message.toString());
+          document.getElementById('rawValue').innerText = data.raw;
+          
+          // 計算強度百分比 (類比值越低，火焰越強)
+          let intensity = Math.max(0, Math.min(100, ((4095 - data.raw) / 4095) * 100));
+          document.getElementById('valBar').style.width = intensity.toFixed(0) + '%';
 
-        const flameIcon = document.getElementById('flameIcon');
-        const statusBadge = document.getElementById('statusBadge');
+          const flameIcon = document.getElementById('flameIcon');
+          const statusBadge = document.getElementById('statusBadge');
 
-        // 動態放大 500 倍算式
-        let scaleFactor = 0.1 + Math.pow(intensity / 100, 2) * 49.9;
-
-        if (data.isFire || data.latched) {
-          flameIcon.className = 'flame-box flame-active';
-          flameIcon.style.transform = `scale(${scaleFactor.toFixed(2)})`;
-          statusBadge.className = 'status-badge badge-danger';
-          statusBadge.innerText = '🚨 警報！偵測到火源！';
-        } else {
-          flameIcon.className = 'flame-box flame-safe';
-          flameIcon.style.transform = 'scale(0.1)';
-          statusBadge.className = 'status-badge badge-safe';
-          statusBadge.innerText = '✅ 系統安全';
+          if (data.isFire || data.latched) {
+            flameIcon.className = 'flame-box flame-active';
+            // 動態放大 (最大約 2.5 倍)
+            let scaleVal = 1 + (intensity / 100) * 1.5;
+            flameIcon.style.transform = `scale(${scaleVal})`;
+            
+            statusBadge.className = 'status-badge badge-danger';
+            statusBadge.innerText = '🚨 警報！偵測到火源！';
+          } else {
+            flameIcon.className = 'flame-box flame-safe';
+            flameIcon.style.transform = 'scale(0.6)';
+            statusBadge.className = 'status-badge badge-safe';
+            statusBadge.innerText = '✅ 系統安全';
+          }
+        } catch(e) {
+          console.error(e);
         }
       }
     });
 
     function resetAlarm() {
-      client.publish(TOPIC_CMD, 'RESET');
+      if (client.connected) {
+        client.publish(TOPIC_CMD, 'RESET');
+      } else {
+        alert('雲端未連線，請檢查 ESP32 是否開機連網！');
+      }
     }
   </script>
 </body>
