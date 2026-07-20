@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🔥 火焰即時監控面板</title>
+  <title>🔥 火焰即時動態監控</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <style>
     * { box-sizing: border-box; }
@@ -34,33 +34,34 @@
       margin-bottom: 15px;
     }
     .flame-container {
-      height: 220px;
+      height: 280px;
       display: flex;
       align-items: center;
       justify-content: center;
       overflow: hidden;
       margin: 15px 0;
       border-radius: 12px;
-      background: #09090d;
+      background: #050508;
+      position: relative;
     }
     .flame-box {
-      font-size: 80px;
-      transition: transform 0.2s ease, filter 0.2s ease;
+      font-size: 50px;
+      transition: transform 0.15s cubic-bezier(0.1, 0.8, 0.3, 1), filter 0.15s ease;
       transform-origin: center center;
       user-select: none;
     }
     .flame-safe {
-      filter: grayscale(80%);
-      opacity: 0.3;
-      transform: scale(0.6);
+      filter: grayscale(90%);
+      opacity: 0.2;
+      transform: scale(0.3);
     }
     .flame-active {
-      filter: drop-shadow(0 0 25px #ff3d00);
-      animation: burn 0.2s infinite alternate ease-in-out;
+      filter: drop-shadow(0 0 35px #ff1100) drop-shadow(0 0 60px #ff9800);
+      animation: burn 0.12s infinite alternate ease-in-out;
     }
     @keyframes burn {
-      0% { transform: scale(1.2) rotate(-5deg); }
-      100% { transform: scale(1.5) rotate(5deg); }
+      0% { transform: scale(var(--flame-scale, 1)) rotate(-8deg); }
+      100% { transform: scale(calc(var(--flame-scale, 1) * 1.15)) rotate(8deg); }
     }
     .status-badge {
       font-size: 18px;
@@ -71,7 +72,7 @@
       margin-bottom: 15px;
     }
     .badge-safe { background: #1b5e20; color: #81c784; }
-    .badge-danger { background: #c62828; color: #ffffff; animation: pulse 0.6s infinite; }
+    .badge-danger { background: #c62828; color: #ffffff; animation: pulse 0.5s infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     .data-card {
       background: #222233;
@@ -99,7 +100,7 @@
 </head>
 <body>
   <div class="container">
-    <h1>🔥 火焰安全即時監控</h1>
+    <h1>🔥 火焰即時動態監控</h1>
     <div id="connStatus" class="conn-status">🔴 雲端連線中...</div>
 
     <div class="flame-container">
@@ -113,13 +114,13 @@
       <div class="bar-bg">
         <div id="valBar" class="bar-fill"></div>
       </div>
+      <small style="color: #888; display: block; margin-top: 6px;">* 火源越近，數值越低，火焰越巨大</small>
     </div>
 
     <button class="reset-btn" onclick="resetAlarm()">🔕 解除警報 / 誤觸復位</button>
   </div>
 
   <script>
-    // 採用安全加密連接端口 wss:// 8884，解決 GitHub Pages 跨網域安全性限制
     const client = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
     const TOPIC_DATA = 'esp32/flame/data_7a44';
@@ -144,11 +145,16 @@
           const data = JSON.parse(message.toString());
           document.getElementById('rawValue').innerText = data.raw;
           
+          // 計算強度 (0% ~ 100%)
           let intensity = Math.max(0, Math.min(100, ((4095 - data.raw) / 4095) * 100));
           document.getElementById('valBar').style.width = intensity.toFixed(0) + '%';
 
           const flameIcon = document.getElementById('flameIcon');
           const statusBadge = document.getElementById('statusBadge');
+
+          // 計算火焰縮放倍率：遠處最小 0.3 倍，極近時爆發放大到 3.5 倍！
+          let scaleMultiplier = 0.3 + Math.pow(intensity / 100, 1.5) * 3.2;
+          flameIcon.style.setProperty('--flame-scale', scaleMultiplier.toFixed(2));
 
           if (data.isFire || data.latched) {
             flameIcon.className = 'flame-box flame-active';
@@ -169,7 +175,7 @@
       if (client.connected) {
         client.publish(TOPIC_CMD, 'RESET');
       } else {
-        alert('雲端未連線，請確認 ESP32 是否已開機並連上網路！');
+        alert('雲端未連線，請確認 ESP32 是否已開機！');
       }
     }
   </script>
